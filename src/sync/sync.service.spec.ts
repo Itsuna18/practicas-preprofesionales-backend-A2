@@ -6,7 +6,7 @@ const prisma = {
   hourLog: { findMany: vi.fn(), create: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
   document: { findMany: vi.fn() },
   evaluation: { findMany: vi.fn() },
-  syncOperation: { create: vi.fn(), findUnique: vi.fn() },
+  syncOperation: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
 }
 
 describe('SyncService', () => {

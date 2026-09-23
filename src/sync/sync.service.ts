@@ -42,10 +42,35 @@ export class SyncService {
   async push(userId: number, ops: SyncOperationInput[]) {
     const results: SyncOperationResult[] = []
     for (const op of ops) {
+      let inserted = false
+      try {
+        await this.prisma.syncOperation.create({
+          data: { clientOpId: op.clientOpId, userId, response: { status: 'pending' } },
+        })
+        inserted = true
+      } catch (err) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((err as any).code !== 'P2002') throw err
+      }
+
+      if (!inserted) {
+        let existing
+        for (let i = 0; i < 20; i++) {
+          existing = await this.prisma.syncOperation.findUnique({
+            where: { clientOpId: op.clientOpId },
+          })
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (existing && (existing.response as any).status !== 'pending') {
+            break
+          }
+          await new Promise((r) => setTimeout(r, 50))
+        }
+        results.push(existing?.response as unknown as SyncOperationResult)
+        continue
+      }
+
       let result: SyncOperationResult
       try {
-        // D-01: sync_operations se escribe pero NUNCA se consulta antes de
-        // aplicar. Un reintento con el mismo clientOpId aplica dos veces.
         result = await this.applyOperation(userId, op)
       } catch (err) {
         result = {
@@ -55,15 +80,11 @@ export class SyncService {
           reason: err instanceof Error ? err.message : 'no se pudo aplicar la operación',
         }
       }
-      try {
-        await this.prisma.syncOperation.create({
-          data: { clientOpId: op.clientOpId, userId, response: result as unknown as object },
-        })
-      } catch {
-        // clientOpId es la clave primaria: un reintento choca con el
-        // registro previo. El log de sync_operations se ignora, pero la
-        // operación de negocio ya se aplicó arriba — eso es D-01.
-      }
+
+      await this.prisma.syncOperation.update({
+        where: { clientOpId: op.clientOpId },
+        data: { response: result as unknown as object },
+      })
       results.push(result)
     }
     return { results }
