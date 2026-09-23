@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { SyncService } from './sync.service'
-import { encodeCheckpoint } from './checkpoint'
 import * as bcrypt from 'bcryptjs'
 
 describe('SyncService Integration (Cursor Pagination)', () => {
@@ -10,6 +9,7 @@ describe('SyncService Integration (Cursor Pagination)', () => {
 
   beforeAll(async () => {
     prisma = new PrismaClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     service = new SyncService(prisma as any)
   })
 
@@ -67,7 +67,6 @@ describe('SyncService Integration (Cursor Pagination)', () => {
     })
 
     // 3. Ejecutar pull limit=1 (debe traer solo un HourLog y el Placement)
-    // Pero ojo: el límite aplica por tabla. Así que traerá 1 Placement y 1 HourLog.
     const page1 = await service.pull(student.id, undefined, 1)
     expect(page1.changes.hourLogs.length).toBe(1)
     
