@@ -8,33 +8,58 @@ export class SyncService {
   constructor(private readonly prisma: PrismaService) {}
 
   async pull(userId: number, since: string | undefined, limit: number) {
-    const cursor = decodeCheckpoint(since)
-    // El cursor avanza por updatedAt.
-    const where = cursor ? { updatedAt: { gt: new Date(cursor.updatedAt) } } : {}
-    const order = { updatedAt: 'asc' as const }
+    const cursor = decodeCheckpoint(since) || {}
+
+    const getWhere = (cp?: { updatedAt: string; id: number }) => {
+      if (!cp) return {}
+      const dt = new Date(cp.updatedAt)
+      return {
+        OR: [
+          { updatedAt: { gt: dt } },
+          { updatedAt: dt, id: { gt: cp.id } },
+        ],
+      }
+    }
+
+    const order = [{ updatedAt: 'asc' as const }, { id: 'asc' as const }]
     const scope = { placement: { OR: [{ studentId: userId }, { tutorId: userId }] } }
 
     const [placements, hourLogs, documents, evaluations] = await Promise.all([
       this.prisma.placement.findMany({
-        where: { ...where, OR: [{ studentId: userId }, { tutorId: userId }] },
+        where: { ...getWhere(cursor.placements), OR: [{ studentId: userId }, { tutorId: userId }] },
         orderBy: order,
         take: limit,
       }),
-      this.prisma.hourLog.findMany({ where: { ...where, ...scope }, orderBy: order, take: limit }),
-      this.prisma.document.findMany({ where: { ...where, ...scope }, orderBy: order, take: limit }),
-      this.prisma.evaluation.findMany({ where: { ...where, ...scope }, orderBy: order, take: limit }),
+      this.prisma.hourLog.findMany({ where: { ...getWhere(cursor.hourLogs), ...scope }, orderBy: order, take: limit }),
+      this.prisma.document.findMany({ where: { ...getWhere(cursor.documents), ...scope }, orderBy: order, take: limit }),
+      this.prisma.evaluation.findMany({ where: { ...getWhere(cursor.evaluations), ...scope }, orderBy: order, take: limit }),
     ])
 
-    const newest = [...placements, ...hourLogs, ...documents, ...evaluations]
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0]
+    const checkpoint: Checkpoint = { ...cursor }
 
-    const checkpoint: Checkpoint | null = newest
-      ? { updatedAt: new Date(newest.updatedAt).toISOString(), id: newest.id }
-      : cursor
+    if (placements.length > 0) {
+      const last = placements[placements.length - 1]
+      checkpoint.placements = { updatedAt: new Date(last.updatedAt).toISOString(), id: last.id }
+    }
+    if (hourLogs.length > 0) {
+      const last = hourLogs[hourLogs.length - 1]
+      checkpoint.hourLogs = { updatedAt: new Date(last.updatedAt).toISOString(), id: last.id }
+    }
+    if (documents.length > 0) {
+      const last = documents[documents.length - 1]
+      checkpoint.documents = { updatedAt: new Date(last.updatedAt).toISOString(), id: last.id }
+    }
+    if (evaluations.length > 0) {
+      const last = evaluations[evaluations.length - 1]
+      checkpoint.evaluations = { updatedAt: new Date(last.updatedAt).toISOString(), id: last.id }
+    }
+
+    // Checkpoint is null only if it has absolutely no cursors
+    const hasAnyCursor = Object.keys(checkpoint).length > 0
 
     return {
       changes: { placements, hourLogs, documents, evaluations },
-      checkpoint: checkpoint ? encodeCheckpoint(checkpoint) : null,
+      checkpoint: hasAnyCursor ? encodeCheckpoint(checkpoint) : null,
       hasMore: [placements, hourLogs, documents, evaluations].some((rows) => rows.length === limit),
     }
   }
