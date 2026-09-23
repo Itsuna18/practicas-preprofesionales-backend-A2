@@ -17,6 +17,14 @@ const PLACEMENTS = 200
 const HOURLOGS_PER_PLACEMENT = 20
 
 async function main() {
+  // Limpiar base de datos para que el seed sea idempotente
+  await prisma.hourLog.deleteMany()
+  await prisma.placement.deleteMany()
+  await prisma.application.deleteMany()
+  await prisma.offer.deleteMany()
+  await prisma.user.deleteMany()
+  await prisma.company.deleteMany()
+
   const password = await bcrypt.hash('yura1234', 10)
 
   const coordinator = await prisma.user.create({
