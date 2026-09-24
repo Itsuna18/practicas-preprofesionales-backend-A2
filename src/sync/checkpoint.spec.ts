@@ -3,7 +3,7 @@ import { decodeCheckpoint, encodeCheckpoint } from './checkpoint'
 
 describe('checkpoint', () => {
   it('round-trips a checkpoint through base64', () => {
-    const cp = { updatedAt: '2026-04-01T12:00:00.000Z', id: 42 }
+    const cp = { hourLogs: { updatedAt: '2026-04-01T12:00:00.000Z', id: 42 } }
 
     expect(decodeCheckpoint(encodeCheckpoint(cp))).toEqual(cp)
   })
