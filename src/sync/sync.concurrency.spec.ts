@@ -19,13 +19,14 @@ describe('SyncService Concurrency (Idempotency)', () => {
   })
 
   it('no debe duplicar registros cuando se envía la misma operación concurrentemente', async () => {
-    const suffix = Date.now().toString()
+    const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    const taxId = Math.floor(1000000000000 + Math.random() * 9000000000000).toString()
     const password = await bcrypt.hash('test', 10)
     const company = await prisma.company.create({
-      data: { taxId: `99${suffix}`.substring(0, 13), name: 'Test', sector: 'IT', contactEmail: `test${suffix}@test.com`, verified: true }
+      data: { taxId, name: 'Test Concurrency', sector: 'IT', contactEmail: `test_${suffix}@test.com`, verified: true }
     })
     const student = await prisma.user.create({
-      data: { email: `sync_test_student_${suffix}@miyura.com`, password, fullName: 'Student', role: 'STUDENT' }
+      data: { email: `sync_student_${suffix}@miyura.com`, password, fullName: 'Student', role: 'STUDENT' }
     })
     const tutor = await prisma.user.create({
       data: { email: `sync_test_tutor_${suffix}@miyura.com`, password, fullName: 'Tutor', role: 'TUTOR' }
