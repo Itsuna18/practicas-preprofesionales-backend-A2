@@ -135,7 +135,9 @@ export class SyncService {
     const incomingVersion = this.getIncomingVersion(op)
 
     if (incomingUpdatedAt !== null && !isNaN(incomingUpdatedAt)) {
-      return existingUpdatedAt > incomingUpdatedAt
+      if (existingUpdatedAt !== incomingUpdatedAt) {
+        return existingUpdatedAt > incomingUpdatedAt
+      }
     }
     if (incomingVersion !== null) {
       return existing.version > incomingVersion
@@ -224,6 +226,8 @@ export class SyncService {
       return { clientOpId: op.clientOpId, status: 'rejected', server: null, reason: 'el registro no pertenece al usuario' }
     }
 
+    const { placement: _p, ...serverRecord } = existing
+
     if (existing.status === HourLogStatus.APPROVED || existing.status === HourLogStatus.REJECTED) {
       const reason = existing.status === HourLogStatus.APPROVED
         ? 'La hora ya fue aprobada por el tutor y no puede ser modificada'
@@ -231,7 +235,7 @@ export class SyncService {
       return {
         clientOpId: op.clientOpId,
         status: 'rejected',
-        server: existing as unknown as Record<string, unknown>,
+        server: serverRecord as unknown as Record<string, unknown>,
         reason,
       }
     }
