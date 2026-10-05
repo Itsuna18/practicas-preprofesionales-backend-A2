@@ -50,3 +50,76 @@ describe('AuthService.login', () => {
     await expect(service.login('tutor0@miyura.com', 'yura1234')).rejects.toThrow(UnauthorizedException)
   })
 })
+
+describe('AuthService.refresh', () => {
+  let service: AuthService
+  const jwtMock = {
+    signAsync: vi.fn(),
+    verifyAsync: vi.fn(),
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    jwtMock.signAsync.mockResolvedValue('nuevo-token')
+    service = new AuthService(prisma as never, jwtMock as never)
+  })
+
+  it('renueva la sesión con un token válido y devuelve un nuevo token', async () => {
+    jwtMock.verifyAsync.mockResolvedValue({
+      sub: 1,
+      email: 'student@miyura.com',
+      role: 'STUDENT',
+      jti: 'jti-antiguo-1',
+    })
+
+    prisma.user.findUnique.mockResolvedValue({
+      id: 1,
+      email: 'student@miyura.com',
+      fullName: 'Estudiante 1',
+      role: 'STUDENT',
+      companyId: null,
+    })
+
+    const result = await service.refresh('token-valido')
+
+    expect(result.accessToken).toBe('nuevo-token')
+    expect(result.user).toEqual({
+      id: 1,
+      email: 'student@miyura.com',
+      fullName: 'Estudiante 1',
+      role: 'STUDENT',
+      companyId: null,
+    })
+    expect(service.isJtiRevoked('jti-antiguo-1')).toBe(true)
+  })
+
+  it('invalida el token anterior impidiendo reutilizarlo para renovar', async () => {
+    jwtMock.verifyAsync.mockResolvedValue({
+      sub: 1,
+      email: 'student@miyura.com',
+      role: 'STUDENT',
+      jti: 'jti-reutilizado',
+    })
+
+    prisma.user.findUnique.mockResolvedValue({
+      id: 1,
+      email: 'student@miyura.com',
+      fullName: 'Estudiante 1',
+      role: 'STUDENT',
+      companyId: null,
+    })
+
+    // Primera renovación exitosa
+    await service.refresh('token-1')
+
+    // Intento de reutilizar el mismo token ya revocado
+    await expect(service.refresh('token-1')).rejects.toThrow('el token ya fue revocado')
+  })
+
+  it('lanza Unauthorized si el token a renovar está expirado o es inválido', async () => {
+    jwtMock.verifyAsync.mockRejectedValue(new Error('jwt expired'))
+
+    await expect(service.refresh('token-expirado')).rejects.toThrow('token expirado o inválido')
+  })
+})
+
