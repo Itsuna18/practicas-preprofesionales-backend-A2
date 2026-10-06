@@ -5,12 +5,16 @@ import { AuthService } from './auth.service'
 import { JwtAuthGuard } from './guards/jwt-auth.guard'
 import { RolesGuard } from './guards/roles.guard'
 
+const jwtSecret = process.env.JWT_SECRET
+if (!jwtSecret) {
+  throw new Error('Falta la variable de entorno JWT_SECRET. Defínela en tu .env antes de arrancar la aplicación.')
+}
+
 @Module({
   imports: [
     JwtModule.register({
       global: true,
-      // D-07: fallback hardcodeado si falta la env. Documentado en KNOWN_ISSUES.md.
-      secret: process.env.JWT_SECRET ?? 'dev-secret-no-cambiar',
+      secret: jwtSecret,
     }),
   ],
   controllers: [AuthController],
