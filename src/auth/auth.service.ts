@@ -49,7 +49,10 @@ export class AuthService {
       this.revokeJti(payload.jti)
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } })
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, email: true, fullName: true, role: true, companyId: true },
+    })
     if (!user) {
       throw new UnauthorizedException('usuario no encontrado')
     }

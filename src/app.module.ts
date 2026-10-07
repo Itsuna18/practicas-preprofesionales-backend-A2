@@ -9,6 +9,9 @@ import { PlacementModule } from './placement/placement.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { SyncModule } from './sync/sync.module'
 
+import { APP_INTERCEPTOR } from '@nestjs/core'
+import { SanitizeResponseInterceptor } from './common/sanitize.interceptor'
+
 @Module({
   imports: [
     PrismaModule,
@@ -20,6 +23,12 @@ import { SyncModule } from './sync/sync.module'
     HourLogModule,
     EvaluationModule,
     SyncModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: SanitizeResponseInterceptor,
+    },
   ],
 })
 export class AppModule {}
