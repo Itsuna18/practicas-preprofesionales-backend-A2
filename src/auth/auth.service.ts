@@ -8,6 +8,7 @@ export interface JwtPayload {
   sub: number
   email: string
   role: Role
+  companyId?: number | null
   jti: string
   iat?: number
   exp?: number
@@ -68,7 +69,7 @@ export class AuthService {
     const jti = crypto.randomUUID()
     const expiresIn = (process.env.JWT_EXPIRES_IN ?? '15m') as `${number}m` | `${number}s` | `${number}h` | `${number}d`
     const accessToken = await this.jwt.signAsync(
-      { sub: user.id, email: user.email, role: user.role, jti },
+      { sub: user.id, email: user.email, role: user.role, companyId: user.companyId, jti },
       { expiresIn },
     )
 
