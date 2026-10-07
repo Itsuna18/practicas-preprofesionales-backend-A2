@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { Global, Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
@@ -10,6 +10,7 @@ if (!jwtSecret) {
   throw new Error('Falta la variable de entorno JWT_SECRET. Defínela en tu .env antes de arrancar la aplicación.')
 }
 
+@Global()
 @Module({
   imports: [
     JwtModule.register({

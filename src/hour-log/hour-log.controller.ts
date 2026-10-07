@@ -31,12 +31,12 @@ export class HourLogController {
   }
 
   @Patch('hour-logs/:id/review')
-  @Roles(Role.TUTOR)
+  @Roles(Role.TUTOR, Role.COORDINATOR)
   review(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ReviewHourLogDto,
-    @Req() req: { user: { sub: number } },
+    @Req() req: { user: { sub: number; role: Role } },
   ) {
-    return this.service.review(id, dto.status, req.user.sub, dto.note)
+    return this.service.review(id, dto.status, req.user.sub, req.user.role, dto.note)
   }
 }
