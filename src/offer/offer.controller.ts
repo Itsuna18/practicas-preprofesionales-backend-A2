@@ -25,25 +25,37 @@ export class OfferController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOne(id)
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: { user: { sub: number; role: Role; companyId?: number | null } },
+  ) {
+    return this.service.findOne(id, req.user)
   }
 
   @Post()
   @Roles(Role.COMPANY, Role.COORDINATOR)
-  create(@Body() dto: CreateOfferDto) {
-    return this.service.create(dto)
+  create(
+    @Body() dto: CreateOfferDto,
+    @Req() req: { user: { sub: number; role: Role; companyId?: number | null } },
+  ) {
+    return this.service.create(dto, req.user)
   }
 
   @Patch(':id/publish')
   @Roles(Role.COMPANY, Role.COORDINATOR)
-  publish(@Param('id', ParseIntPipe) id: number) {
-    return this.service.publish(id)
+  publish(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: { user: { sub: number; role: Role; companyId?: number | null } },
+  ) {
+    return this.service.publish(id, req.user)
   }
 
   @Patch(':id/close')
   @Roles(Role.COMPANY, Role.COORDINATOR)
-  close(@Param('id', ParseIntPipe) id: number) {
-    return this.service.close(id)
+  close(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: { user: { sub: number; role: Role; companyId?: number | null } },
+  ) {
+    return this.service.close(id, req.user)
   }
 }

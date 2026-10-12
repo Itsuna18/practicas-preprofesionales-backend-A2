@@ -1,4 +1,5 @@
-import { BadRequestException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException } from '@nestjs/common'
+import { Role } from '@prisma/client'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApplicationService } from './application.service'
 
@@ -50,5 +51,80 @@ describe('ApplicationService', () => {
 
     expect(result).toHaveLength(2)
     expect(result[0]).toMatchObject({ id: 1, student: { fullName: 'Estudiante 10' } })
+  })
+
+  describe('E3-07: Control de pertenencia en postulaciones', () => {
+    it('bloquea a una empresa ajena al listar postulaciones de una oferta (403 Forbidden)', async () => {
+      prisma.offer.findUnique.mockResolvedValue({ id: 1, companyId: 10 })
+
+      await expect(
+        service.listByOffer(1, { sub: 5, role: Role.COMPANY, companyId: 99 }),
+      ).rejects.toThrow(ForbiddenException)
+    })
+
+    it('permite a la empresa dueña listar sus postulaciones', async () => {
+      prisma.offer.findUnique.mockResolvedValue({ id: 1, companyId: 10 })
+      prisma.application.findMany.mockResolvedValue([])
+
+      const result = await service.listByOffer(1, { sub: 5, role: Role.COMPANY, companyId: 10 })
+      expect(result).toEqual([])
+    })
+
+    it('permite a coordinación listar postulaciones de cualquier oferta', async () => {
+      prisma.application.findMany.mockResolvedValue([])
+
+      const result = await service.listByOffer(1, { sub: 1, role: Role.COORDINATOR })
+      expect(result).toEqual([])
+    })
+
+    it('bloquea a una empresa ajena al decidir postulaciones (403 Forbidden)', async () => {
+      prisma.application.findUnique.mockResolvedValue({
+        id: 7,
+        offerId: 1,
+        status: 'SUBMITTED',
+        offer: { id: 1, companyId: 10 },
+      })
+
+      await expect(
+        service.decide(7, 'ACCEPTED' as never, { sub: 8, role: Role.COMPANY, companyId: 99 }),
+      ).rejects.toThrow(ForbiddenException)
+    })
+
+    it('permite a la empresa dueña decidir una postulación propia', async () => {
+      prisma.application.findUnique.mockResolvedValue({
+        id: 7,
+        offerId: 1,
+        status: 'SUBMITTED',
+        offer: { id: 1, companyId: 10, seats: 3 },
+      })
+      offers.acceptedCount.mockResolvedValue(1)
+      prisma.application.update.mockImplementation(({ data }) => Promise.resolve({ id: 7, ...data }))
+
+      const result = await service.decide(7, 'ACCEPTED' as never, {
+        sub: 8,
+        role: Role.COMPANY,
+        companyId: 10,
+      })
+
+      expect(result.status).toBe('ACCEPTED')
+    })
+
+    it('permite a coordinación decidir postulaciones de cualquier empresa', async () => {
+      prisma.application.findUnique.mockResolvedValue({
+        id: 7,
+        offerId: 1,
+        status: 'SUBMITTED',
+        offer: { id: 1, companyId: 10, seats: 3 },
+      })
+      offers.acceptedCount.mockResolvedValue(1)
+      prisma.application.update.mockImplementation(({ data }) => Promise.resolve({ id: 7, ...data }))
+
+      const result = await service.decide(7, 'ACCEPTED' as never, {
+        sub: 1,
+        role: Role.COORDINATOR,
+      })
+
+      expect(result.status).toBe('ACCEPTED')
+    })
   })
 })
