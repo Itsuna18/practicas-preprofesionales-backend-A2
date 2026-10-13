@@ -55,7 +55,6 @@ export class ApplicationService {
     }
   }
 
-  // D-04: N+1. Una consulta por la lista y otra por cada estudiante.
   async listByOffer(
     offerId: number,
     user?: { sub?: number; role?: Role; companyId?: number | null },
@@ -64,16 +63,14 @@ export class ApplicationService {
       await this.assertOfferAccess(offerId, user)
     }
 
-    const applications = await this.prisma.application.findMany({ where: { offerId } })
-    const rows = []
-    for (const application of applications) {
-      const student = await this.prisma.user.findUnique({
-        where: { id: application.studentId },
-        select: { id: true, email: true, fullName: true },
-      })
-      rows.push({ ...application, student })
-    }
-    return rows
+    return this.prisma.application.findMany({
+      where: { offerId },
+      include: {
+        student: {
+          select: { id: true, email: true, fullName: true },
+        },
+      },
+    })
   }
 
   private assertValidStatusTransition(applicationStatus: ApplicationStatus): void {
