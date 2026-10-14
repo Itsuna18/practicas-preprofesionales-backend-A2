@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
-import { ApplicationStatus, OfferStatus, Role } from '@prisma/client'
+import { ApplicationStatus, OfferStatus, Prisma, Role } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
 import type { CreateOfferDto } from './dto/create-offer.dto'
 
@@ -103,8 +103,12 @@ export class OfferService {
   }
 
   // Cuenta las postulaciones ya aceptadas para una oferta.
-  acceptedCount(offerId: number): Promise<number> {
-    return this.prisma.application.count({
+  acceptedCount(
+    offerId: number,
+    client?: Prisma.TransactionClient | PrismaService,
+  ): Promise<number> {
+    const prisma = client ?? this.prisma
+    return prisma.application.count({
       where: { offerId, status: ApplicationStatus.ACCEPTED },
     })
   }
