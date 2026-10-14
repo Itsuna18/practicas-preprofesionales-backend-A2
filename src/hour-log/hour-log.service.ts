@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { HourLogStatus, PlacementStatus, Role } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
+import { HOURS_OUT_OF_RANGE_MESSAGE, MAX_HOURS_PER_LOG, MIN_HOURS_PER_LOG } from '../common/hour-log-rules'
 import type { CreateHourLogDto } from './dto/create-hour-log.dto'
 
 // D-02 (deuda sembrada, documentada a propósito): este servicio es un
@@ -15,7 +16,7 @@ import type { CreateHourLogDto } from './dto/create-hour-log.dto'
 // separado.
 @Injectable()
 export class HourLogService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * Registra una jornada de horas para el placement del estudiante.
@@ -35,15 +36,7 @@ export class HourLogService {
       throw new BadRequestException('el placement no está activo')
     }
 
-    // D-06 (copia 2): la misma validación que el DTO, con tope 10 en vez de 12.
-    if (dto.hours <= 0 || dto.hours > 10) {
-      throw new BadRequestException('las horas deben estar entre 0 y 10')
-    }
-    const [startHour, startMinute] = dto.startTime.split(':').map(Number)
-    const [endHour, endMinute] = dto.endTime.split(':').map(Number)
-    if (startHour * 60 + startMinute >= endHour * 60 + endMinute) {
-      throw new BadRequestException('la hora de inicio debe ser anterior a la de fin')
-    }
+    this.assertValidHourLogInput(dto)
 
     // La fecha del registro llega desde el cliente y se persiste tal como fue recibida.
     const created = await this.prisma.hourLog.create({
@@ -276,17 +269,7 @@ export class HourLogService {
     const rows: (string | number)[][] = [header]
 
     for (const dto of logs) {
-      // D-06 (copia 3): la misma validación que en `create`, pegada de
-      // nuevo en vez de compartida — otra copia más de la divergencia de
-      // umbrales entre el DTO (tope 12) y el servicio (tope 10).
-      if (dto.hours <= 0 || dto.hours > 10) {
-        throw new BadRequestException('las horas deben estar entre 0 y 10')
-      }
-      const [startHour, startMinute] = dto.startTime.split(':').map(Number)
-      const [endHour, endMinute] = dto.endTime.split(':').map(Number)
-      if (startHour * 60 + startMinute >= endHour * 60 + endMinute) {
-        throw new BadRequestException('la hora de inicio debe ser anterior a la de fin')
-      }
+      this.assertValidHourLogInput(dto)
 
       rows.push([
         dto.id,
@@ -320,5 +303,19 @@ export class HourLogService {
     const needsQuoting = value.includes(',') || value.includes('"') || value.includes('\n')
     if (!needsQuoting) return value
     return `"${value.replace(/"/g, '""')}"`
+  }
+    /**
+   * Valida el rango de horas y el orden de inicio/fin de un registro.
+   * Centraliza lo que antes estaba copiado entre `create` y `exportRows`.
+   */
+  private assertValidHourLogInput(input: { hours: number; startTime: string; endTime: string }): void {
+    if (input.hours < MIN_HOURS_PER_LOG || input.hours > MAX_HOURS_PER_LOG) {
+      throw new BadRequestException(HOURS_OUT_OF_RANGE_MESSAGE)
+    }
+    const [startHour, startMinute] = input.startTime.split(':').map(Number)
+    const [endHour, endMinute] = input.endTime.split(':').map(Number)
+    if (startHour * 60 + startMinute >= endHour * 60 + endMinute) {
+      throw new BadRequestException('la hora de inicio debe ser anterior a la de fin')
+    }
   }
 }
