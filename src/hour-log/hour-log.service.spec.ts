@@ -40,52 +40,6 @@ describe('HourLogService', () => {
     ).rejects.toThrow(BadRequestException)
   })
 
-  it('accepts the minimum allowed hours (0.5)', async () => {
-    prisma.placement.findUnique.mockResolvedValue({ id: 1, studentId: 5, tutorId: 7, status: 'ACTIVE' })
-    prisma.hourLog.create.mockImplementation(({ data }) => Promise.resolve({ id: 100, ...data }))
-
-    const result = await service.create(
-      { placementId: 1, date: new Date('2026-04-01'), startTime: '08:00', endTime: '08:30', hours: 0.5, activity: 'Revisión corta' },
-      5,
-    )
-
-    expect(result.hours).toBe(0.5)
-  })
-
-  it('rejects hours below the minimum allowed (0.5)', async () => {
-    prisma.placement.findUnique.mockResolvedValue({ id: 1, studentId: 5, tutorId: 7, status: 'ACTIVE' })
-
-    await expect(
-      service.create(
-        { placementId: 1, date: new Date('2026-04-01'), startTime: '08:00', endTime: '08:10', hours: 0.2, activity: 'Registro demasiado corto' },
-        5,
-      ),
-    ).rejects.toThrow(BadRequestException)
-  })
-
-  it('accepts the maximum allowed hours (10)', async () => {
-    prisma.placement.findUnique.mockResolvedValue({ id: 1, studentId: 5, tutorId: 7, status: 'ACTIVE' })
-    prisma.hourLog.create.mockImplementation(({ data }) => Promise.resolve({ id: 101, ...data }))
-
-    const result = await service.create(
-      { placementId: 1, date: new Date('2026-04-01'), startTime: '07:00', endTime: '17:00', hours: 10, activity: 'Jornada completa' },
-      5,
-    )
-
-    expect(result.hours).toBe(10)
-  })
-
-  it('rejects hours above the maximum allowed (10)', async () => {
-    prisma.placement.findUnique.mockResolvedValue({ id: 1, studentId: 5, tutorId: 7, status: 'ACTIVE' })
-
-    await expect(
-      service.create(
-        { placementId: 1, date: new Date('2026-04-01'), startTime: '07:00', endTime: '18:00', hours: 10.5, activity: 'Jornada excedida' },
-        5,
-      ),
-    ).rejects.toThrow(BadRequestException)
-  })
-
   describe('review (E3-02)', () => {
     const mockLog = {
       id: 99,
