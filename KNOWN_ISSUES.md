@@ -16,13 +16,6 @@ no está cerrando el círculo. No tuvimos tiempo de sentarnos a entenderlo.
 
 Workaround actual: el coordinador borra los duplicados a mano.
 
-## D-02 · `HourLogService` se nos fue de las manos
-
-`src/hour-log/hour-log.service.ts`
-
-Empezó siendo el CRUD de horas y terminó haciendo validación, persistencia, notificación al
-tutor y agregación de reportes. Pasa las 300 líneas. Cada vez que hay que tocar algo ahí, hay
-que leerlo entero. Habría que partirlo por responsabilidad, pero nunca fue prioridad.
 
 ## D-03 · El módulo de evaluaciones no tiene tests
 
@@ -48,11 +41,5 @@ acreditación adentro. Funciona — hasta donde sabemos — pero solo hay dos te
 cualquier cambio es a ciegas. Si te toca modificar reglas de acreditación, escribe primero
 tests de los casos que hoy funcionan.
 
-## D-06 · La validación de horas está en tres lados
 
-`src/hour-log/dto/create-hour-log.dto.ts`, `src/hour-log/hour-log.service.ts` y el formulario
-del frontend.
-
-Y ya divergieron: el DTO acepta hasta 12 horas por registro y el servicio corta en 10. El
-formulario tiene su propia versión. Nadie recuerda cuál es la correcta.
 
