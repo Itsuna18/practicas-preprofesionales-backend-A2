@@ -169,17 +169,19 @@ export function validateHourLogDate(
     throw new BadRequestException('no se pueden registrar horas con fecha futura')
   }
 
-  // 2. Validar rango de la práctica si el placement tiene definidos startDate y endDate
+  // 2. Validar rango de la práctica si el placement tiene un rango definido (startDate < endDate)
   if (placement.startDate && placement.endDate) {
     const start = normalizeCalendarDate(placement.startDate, timeZone)
     const end = normalizeCalendarDate(placement.endDate, timeZone)
 
-    if (normalizedDate.getTime() < start.getTime() || normalizedDate.getTime() > end.getTime()) {
-      const startStr = formatCalendarDate(start)
-      const endStr = formatCalendarDate(end)
-      throw new BadRequestException(
-        `la fecha está fuera del rango de la práctica (rango válido: ${startStr} a ${endStr})`,
-      )
+    if (start.getTime() < end.getTime()) {
+      if (normalizedDate.getTime() < start.getTime() || normalizedDate.getTime() > end.getTime()) {
+        const startStr = formatCalendarDate(start)
+        const endStr = formatCalendarDate(end)
+        throw new BadRequestException(
+          `la fecha está fuera del rango de la práctica (rango válido: ${startStr} a ${endStr})`,
+        )
+      }
     }
   }
 
