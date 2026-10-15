@@ -1,17 +1,23 @@
-import { Type } from 'class-transformer'
+import { Transform } from 'class-transformer'
 import { IsDate, IsInt, IsString, Matches, Max, MaxLength, Min } from 'class-validator'
+import { normalizeCalendarDate } from '../../common/date.utils'
+import { HOURS_OUT_OF_RANGE_MESSAGE, MAX_HOURS_PER_LOG, MIN_HOURS_PER_LOG } from '../../common/hour-log-rules'
+
 
 export class CreateHourLogDto {
   @IsInt() placementId!: number
 
-  @Type(() => Date) @IsDate() date!: Date
+  @Transform(({ value }) => (value ? normalizeCalendarDate(value) : value))
+  @IsDate()
+  date!: Date
 
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) startTime!: string
 
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) endTime!: string
 
-  // D-06 (copia 1): tope 12.
-  @Min(0.5) @Max(12) hours!: number
+  @Min(MIN_HOURS_PER_LOG, { message: HOURS_OUT_OF_RANGE_MESSAGE })
+  @Max(MAX_HOURS_PER_LOG, { message: HOURS_OUT_OF_RANGE_MESSAGE })
+  hours!: number
 
   @IsString() @MaxLength(500) activity!: string
 }
