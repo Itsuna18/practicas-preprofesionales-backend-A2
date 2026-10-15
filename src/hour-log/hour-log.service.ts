@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { HourLogStatus, PlacementStatus, Role } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
+import { validateHourLogDate } from '../common/date.utils'
 import type { CreateHourLogDto } from './dto/create-hour-log.dto'
 
 // D-02 (deuda sembrada, documentada a propósito): este servicio es un
@@ -45,11 +46,14 @@ export class HourLogService {
       throw new BadRequestException('la hora de inicio debe ser anterior a la de fin')
     }
 
-    // La fecha del registro llega desde el cliente y se persiste tal como fue recibida.
+    // E6-02: Normalización de fecha a día calendario institucional y validaciones
+    // de fecha futura y rango de fechas de la práctica (startDate - endDate).
+    const normalizedDate = validateHourLogDate(dto.date, placement)
+
     const created = await this.prisma.hourLog.create({
       data: {
         placementId: dto.placementId,
-        date: dto.date,
+        date: normalizedDate,
         startTime: dto.startTime,
         endTime: dto.endTime,
         hours: dto.hours,
