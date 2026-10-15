@@ -189,6 +189,9 @@ model HourLog {
   reviewedBy User?     @relation("HourLogReviewer", fields: [reviewedById], references: [id])
 
   @@index([updatedAt, id])
+  // E2-04: el libro de horas filtra por práctica y ordena por fecha; sin este
+  // índice la consulta recorre la tabla entera.
+  @@index([placementId, date])
   @@map("hour_logs")
 }
 
