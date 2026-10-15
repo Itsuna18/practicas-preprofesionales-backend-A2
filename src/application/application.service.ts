@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
-import { ApplicationStatus, Prisma, Role } from '@prisma/client'
+import { ApplicationStatus, Role } from '@prisma/client'
 import { OfferService } from '../offer/offer.service'
 import { PrismaService } from '../prisma/prisma.service'
 
@@ -55,6 +55,7 @@ export class ApplicationService {
     }
   }
 
+  // D-04: N+1. Una consulta por la lista y otra por cada estudiante.
   async listByOffer(
     offerId: number,
     user?: { sub?: number; role?: Role; companyId?: number | null },
@@ -63,14 +64,16 @@ export class ApplicationService {
       await this.assertOfferAccess(offerId, user)
     }
 
-    return this.prisma.application.findMany({
-      where: { offerId },
-      include: {
-        student: {
-          select: { id: true, email: true, fullName: true },
-        },
-      },
-    })
+    const applications = await this.prisma.application.findMany({ where: { offerId } })
+    const rows = []
+    for (const application of applications) {
+      const student = await this.prisma.user.findUnique({
+        where: { id: application.studentId },
+        select: { id: true, email: true, fullName: true },
+      })
+      rows.push({ ...application, student })
+    }
+    return rows
   }
 
   private assertValidStatusTransition(applicationStatus: ApplicationStatus): void {
@@ -79,45 +82,11 @@ export class ApplicationService {
     }
   }
 
-  private async assertCompanyDecisionAccess(
-    offer?: { companyId: number },
-    user?: { sub?: number; role?: Role; companyId?: number | null },
-  ): Promise<void> {
-    if (user && user.role !== Role.COORDINATOR) {
-      const resolvedCompanyId = await this.resolveCompanyId(user)
-      if (!resolvedCompanyId || offer?.companyId !== resolvedCompanyId) {
-        throw new ForbiddenException('no tienes permiso para decidir postulaciones de esta oferta')
-      }
-    }
-  }
-
-  private async assertOfferHasSeats(
-    offerId: number,
-    client?: Prisma.TransactionClient | PrismaService,
-  ): Promise<void> {
-    const tx = client ?? this.prisma
-    let offerSeats: number | undefined
-
-    if (typeof tx.$queryRaw === 'function') {
-      const lockedOffers = await tx.$queryRaw<Array<{ id: number; seats: number }>>`
-        SELECT id, seats FROM "offers" WHERE id = ${offerId} FOR UPDATE
-      `
-      offerSeats = lockedOffers?.[0]?.seats
-    }
-
-    if (offerSeats === undefined) {
-      const offer = await tx.offer.findUnique({ where: { id: offerId } })
-      if (!offer) throw new NotFoundException('oferta no encontrada')
-      offerSeats = offer.seats
-    }
-
-    const accepted = typeof this.offers.acceptedCount === 'function'
-      ? await this.offers.acceptedCount(offerId, tx)
-      : await tx.application.count({
-          where: { offerId, status: ApplicationStatus.ACCEPTED },
-        })
-
-    if (accepted >= offerSeats) throw new BadRequestException('la oferta ya no tiene cupos')
+  private async assertOfferHasSeats(offerId: number): Promise<void> {
+    const offer = await this.prisma.offer.findUnique({ where: { id: offerId } })
+    if (!offer) throw new NotFoundException('oferta no encontrada')
+    const accepted = await this.offers.acceptedCount(offerId)
+    if (accepted >= offer.seats) throw new BadRequestException('la oferta ya no tiene cupos')
   }
 
   async decide(
@@ -125,28 +94,28 @@ export class ApplicationService {
     status: ApplicationStatus,
     user?: { sub?: number; role?: Role; companyId?: number | null },
   ) {
-    const executeInTx = typeof this.prisma.$transaction === 'function'
-      ? <T>(action: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> => this.prisma.$transaction(action)
-      : <T>(action: (tx: PrismaService) => Promise<T>): Promise<T> => action(this.prisma)
+    const application = await this.prisma.application.findUnique({
+      where: { id },
+      include: { offer: true },
+    })
+    if (!application) throw new NotFoundException('postulación no encontrada')
 
-    return executeInTx(async (tx) => {
-      const application = await tx.application.findUnique({
-        where: { id },
-        include: { offer: true },
-      })
-      if (!application) throw new NotFoundException('postulación no encontrada')
-
-      await this.assertCompanyDecisionAccess(application.offer, user)
-      this.assertValidStatusTransition(application.status)
-
-      if (status === ApplicationStatus.ACCEPTED) {
-        await this.assertOfferHasSeats(application.offerId, tx)
+    if (user && user.role !== Role.COORDINATOR) {
+      const companyId = await this.resolveCompanyId(user)
+      if (!companyId || application.offer.companyId !== companyId) {
+        throw new ForbiddenException('no tienes permiso para decidir postulaciones de esta oferta')
       }
+    }
 
-      return tx.application.update({
-        where: { id },
-        data: { status, decidedAt: new Date() },
-      })
+    this.assertValidStatusTransition(application.status)
+
+    if (status === ApplicationStatus.ACCEPTED) {
+      await this.assertOfferHasSeats(application.offerId)
+    }
+
+    return this.prisma.application.update({
+      where: { id },
+      data: { status, decidedAt: new Date() },
     })
   }
 }

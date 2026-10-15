@@ -74,24 +74,15 @@ describe('E3-06: Protección de datos sensibles y acotamiento de consultas', () 
   it('ApplicationService.listByOffer acota explícitamente los campos del estudiante', async () => {
     const prismaMock = {
       application: {
-        findMany: vi.fn().mockImplementation((args) => {
-          expect(args.include.student).toEqual({
-            select: { id: true, email: true, fullName: true },
-          })
-          return Promise.resolve([
-            {
-              id: 1,
-              offerId: 5,
-              studentId: 10,
-              motivation: 'Interés',
-              status: 'SUBMITTED',
-              student: {
-                id: 10,
-                email: 'candidato@miyura.com',
-                fullName: 'Candidato Uno',
-              },
-            },
-          ])
+        findMany: vi.fn().mockResolvedValue([
+          { id: 1, offerId: 5, studentId: 10, motivation: 'Interés', status: 'SUBMITTED' },
+        ]),
+      },
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 10,
+          email: 'candidato@miyura.com',
+          fullName: 'Candidato Uno',
         }),
       },
     }
@@ -99,7 +90,10 @@ describe('E3-06: Protección de datos sensibles y acotamiento de consultas', () 
     const applicationService = new ApplicationService(prismaMock as never, {} as never)
     const result = await applicationService.listByOffer(5)
 
-    expect(prismaMock.application.findMany).toHaveBeenCalled()
+    expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+      where: { id: 10 },
+      select: { id: true, email: true, fullName: true },
+    })
 
     const student = result[0].student as Record<string, unknown>
     expect(student.password).toBeUndefined()

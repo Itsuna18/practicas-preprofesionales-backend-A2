@@ -40,22 +40,17 @@ describe('ApplicationService', () => {
 
   it('lists applications of an offer with their student', async () => {
     prisma.application.findMany.mockResolvedValue([
-      { id: 1, studentId: 10, status: 'SUBMITTED', student: { id: 10, fullName: 'Estudiante 10' } },
-      { id: 2, studentId: 11, status: 'SUBMITTED', student: { id: 11, fullName: 'Estudiante 11' } },
+      { id: 1, studentId: 10, status: 'SUBMITTED' },
+      { id: 2, studentId: 11, status: 'SUBMITTED' },
     ])
+    prisma.user.findUnique
+      .mockResolvedValueOnce({ id: 10, fullName: 'Estudiante 10' })
+      .mockResolvedValueOnce({ id: 11, fullName: 'Estudiante 11' })
 
     const result = await service.listByOffer(1)
 
     expect(result).toHaveLength(2)
     expect(result[0]).toMatchObject({ id: 1, student: { fullName: 'Estudiante 10' } })
-    expect(prisma.application.findMany).toHaveBeenCalledWith({
-      where: { offerId: 1 },
-      include: {
-        student: {
-          select: { id: true, email: true, fullName: true },
-        },
-      },
-    })
   })
 
   describe('E3-07: Control de pertenencia en postulaciones', () => {
