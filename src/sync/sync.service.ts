@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { type HourLog, HourLogStatus } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
+import { normalizeCalendarDate, validateHourLogDate } from '../common/date.utils'
 import { type Checkpoint, decodeCheckpoint, encodeCheckpoint } from './checkpoint'
 import type { SyncOperationInput, SyncOperationResult } from './dto/push.dto'
 
@@ -151,10 +152,12 @@ export class SyncService {
       return { clientOpId: op.clientOpId, status: 'rejected', server: null, reason: 'el placement no pertenece al usuario' }
     }
 
+    const normalizedDate = validateHourLogDate(op.payload.date as string | Date, placement)
+
     const created = await this.prisma.hourLog.create({
       data: {
         placementId: Number(op.payload.placementId),
-        date: new Date(String(op.payload.date)),
+        date: normalizedDate,
         startTime: String(op.payload.startTime),
         endTime: String(op.payload.endTime),
         hours: Number(op.payload.hours),
@@ -171,7 +174,7 @@ export class SyncService {
   ) {
     const data: Record<string, unknown> = { version: { increment: 1 } }
     if (incomingStatus) data.status = incomingStatus as HourLogStatus
-    if (payload.date) data.date = new Date(String(payload.date))
+    if (payload.date) data.date = normalizeCalendarDate(payload.date as string | Date)
     if (payload.startTime) data.startTime = String(payload.startTime)
     if (payload.endTime) data.endTime = String(payload.endTime)
     if (payload.hours !== undefined) data.hours = Number(payload.hours)
