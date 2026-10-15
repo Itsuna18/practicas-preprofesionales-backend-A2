@@ -5,3 +5,9 @@ coverage
 eslint-report.json
 .env
 .yura-ci/
+
+DATA_EXPOSURE_AUDIT.md
+guia-proyecto-modalidad-a.pdf
+KNOWN_ISSUES.md
+REPORTE-E2-01.md
+SECURITY_AUDIT.md
