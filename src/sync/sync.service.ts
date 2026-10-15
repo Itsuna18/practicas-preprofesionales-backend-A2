@@ -152,7 +152,7 @@ export class SyncService {
       return { clientOpId: op.clientOpId, status: 'rejected', server: null, reason: 'el placement no pertenece al usuario' }
     }
 
-    const normalizedDate = validateHourLogDate(op.payload.date as string | Date, placement)
+    const normalizedDate = normalizeCalendarDate(op.payload.date as string | Date)
 
     const created = await this.prisma.hourLog.create({
       data: {
