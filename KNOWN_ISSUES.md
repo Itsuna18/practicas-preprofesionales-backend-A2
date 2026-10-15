@@ -43,3 +43,14 @@ tests de los casos que hoy funcionan.
 
 
 
+## E6-02 · Decisión arquitectónica: Fechas de prácticas como "Día Calendario"
+
+`src/common/date.utils.ts`, `src/hour-log/hour-log.service.ts` y `src/sync/sync.service.ts`.
+
+Las fechas de las jornadas registradas en el libro de horas (`HourLog.date`) se definen formalmente como **DÍA CALENDARIO** (fecha civil institucional: año, mes, día) y no como un instante de tiempo.
+- **Motivo**: Tratar la fecha de la práctica como un instante con zona horaria libre provocaba que dispositivos en distintas zonas horarias (Japón UTC+9, España UTC+2, California UTC-7) guardaran registros en días distintos en UTC y permitieran fechas fuera de rango.
+- **Normalización**: Las fechas entrantes (vía HTTP o sincronización offline) se normalizan a la medianoche UTC (`00:00:00.000Z`) del día calendario correspondiente según la zona horaria institucional configurable (`INSTITUTIONAL_TIMEZONE`, por defecto `America/Guayaquil`).
+- **Compatibilidad con registros previos**: Como los registros históricos del seed ya se crearon a medianoche UTC, ninguno cambia de día al desplegar (sin requerir migración destructiva).
+- **Validaciones de negocio**: Se impide registrar jornadas con fecha futura y fechas fuera del rango de la práctica (`startDate` a `endDate`), respondiendo con un mensaje claro que indica el rango válido.
+
+

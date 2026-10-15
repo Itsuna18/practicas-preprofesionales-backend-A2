@@ -1,6 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
 import { HourLogStatus, PlacementStatus, Role } from '@prisma/client'
 import { PrismaService } from '../prisma/prisma.service'
+import { validateHourLogDate } from '../common/date.utils'
+
 import type { CreateHourLogDto } from './dto/create-hour-log.dto'
 import { HourLogValidationService } from './hour-log-validation.service'
 import { HourLogNotificationService } from './hour-log-notification.service'
@@ -35,10 +37,14 @@ export class HourLogService {
 
     this.validator.assertValidHourLogInput(dto)
 
+    // E6-02: Normalización de fecha a día calendario institucional y validaciones
+    // de fecha futura y rango de fechas de la práctica (startDate - endDate).
+    const normalizedDate = validateHourLogDate(dto.date, placement)
+
     const created = await this.prisma.hourLog.create({
       data: {
         placementId: dto.placementId,
-        date: dto.date,
+        date: normalizedDate,
         startTime: dto.startTime,
         endTime: dto.endTime,
         hours: dto.hours,
