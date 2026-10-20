@@ -32,11 +32,11 @@ rompe.
 Con menos de 200 postulaciones no se nota. Arriba de eso, la pantalla de la empresa tarda
 varios segundos. Sospechamos que es cómo traemos los estudiantes, pero no lo medimos.
 
-## D-05 · `calculateAccreditationStatus` da miedo tocarla
+## D-05 · `calculateAccreditationStatus` da miedo tocarla [PAGADA en E5-02]
 
 `src/placement/accreditation.ts`
 
-ESLint la marca por complejidad. Son `if` anidados hasta seis niveles con toda la lógica de
+Resuelta en E5-02 mediante una tabla declarativa de reglas (Rule Engine), eliminando los 6 niveles de anidamiento y reduciendo la complejidad ciclomática a umbrales limpios de ESLint. Anteriormente: Son `if` anidados hasta seis niveles con toda la lógica de
 acreditación adentro. Funciona — hasta donde sabemos — pero solo hay dos tests, así que
 cualquier cambio es a ciegas. Si te toca modificar reglas de acreditación, escribe primero
 tests de los casos que hoy funcionan.
