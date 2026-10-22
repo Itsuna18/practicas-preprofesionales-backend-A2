@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { ApplicationModule } from './application/application.module'
+import { AssistantModule } from './assistant/assistant.module'
 import { AuthModule } from './auth/auth.module'
 import { CompanyModule } from './company/company.module'
 import { EvaluationModule } from './evaluation/evaluation.module'
@@ -25,6 +26,7 @@ import { SanitizeResponseInterceptor } from './common/sanitize.interceptor'
     EvaluationModule,
     SyncModule,
     RecommendationModule,
+    AssistantModule,
   ],
   providers: [
     {
