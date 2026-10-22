@@ -34,6 +34,7 @@ comprueba que el recurso le pertenece a quien llama.
 | GET | /profile | STUDENT | Sí, implícito por token |
 | PATCH | /profile | STUDENT | Sí, implícito por token |
 | GET | /recommendations/offers | STUDENT | Sí, implícito por token; solo ofertas publicadas |
+| POST | /assistant/chat | cualquier rol autenticado | Sí, el contexto se arma con los datos del propio usuario |
 
 Frontend: no tiene autorización propia, confía en el backend. No se audita aparte.
 
