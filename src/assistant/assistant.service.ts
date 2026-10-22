@@ -84,6 +84,10 @@ export class AssistantService {
         return new ServiceUnavailableException(`La clave de ${label} no es válida. Revisa el .env del backend.`)
       case 'rate':
         return new HttpException(`${label} está saturado o se agotó el cupo gratuito. Prueba de nuevo en un momento.`, HttpStatus.TOO_MANY_REQUESTS)
+      case 'model':
+        return new ServiceUnavailableException(
+          `${error.message}. Elige un modelo disponible en el .env (GROQ_MODEL u OLLAMA_MODEL) y reinicia el backend.`,
+        )
       case 'connection':
         return new ServiceUnavailableException(`No se pudo contactar a ${label}. Revisa la conexión del servidor.`)
       default:

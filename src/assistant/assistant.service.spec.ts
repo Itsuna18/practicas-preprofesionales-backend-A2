@@ -74,6 +74,7 @@ describe('AssistantService', () => {
   it.each([
     ['auth', HttpStatus.SERVICE_UNAVAILABLE, /La clave de Groq no es válida/],
     ['rate', HttpStatus.TOO_MANY_REQUESTS, /cupo gratuito/],
+    ['model', HttpStatus.SERVICE_UNAVAILABLE, /Elige un modelo disponible/],
     ['connection', HttpStatus.SERVICE_UNAVAILABLE, /No se pudo contactar a Groq/],
     ['api', HttpStatus.BAD_GATEWAY, /error/],
   ] as const)('translates a %s provider error into a clear HTTP error', async (kind, status, message) => {

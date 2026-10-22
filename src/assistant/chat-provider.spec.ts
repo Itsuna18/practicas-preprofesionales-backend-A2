@@ -75,6 +75,7 @@ describe('OpenAICompatibleProvider', () => {
   it.each([
     [401, 'auth'],
     [429, 'rate'],
+    [404, 'model'],
     [500, 'api'],
   ] as const)('maps HTTP %s to a %s error', async (status, kind) => {
     stubFetch({ ok: false, status })

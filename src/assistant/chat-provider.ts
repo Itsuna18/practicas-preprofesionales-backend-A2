@@ -11,7 +11,7 @@ export interface ProviderReply {
   refused: boolean
 }
 
-export type ProviderErrorKind = 'auth' | 'rate' | 'connection' | 'api'
+export type ProviderErrorKind = 'auth' | 'rate' | 'model' | 'connection' | 'api'
 
 export class ProviderError extends Error {
   constructor(
@@ -46,7 +46,8 @@ export class OpenAICompatibleProvider implements ChatProvider {
     const res = await this.post({
       model: this.model,
       temperature: 0.3,
-      max_tokens: 1024,
+      // Los modelos que razonan (gpt-oss) gastan parte de este margen pensando.
+      max_tokens: 2048,
       messages: [{ role: 'system', content: system.join('\n\n') }, ...messages],
     })
     this.assertOk(res)
@@ -71,6 +72,7 @@ export class OpenAICompatibleProvider implements ChatProvider {
   private assertOk(res: Response): void {
     if (res.status === 401 || res.status === 403) throw new ProviderError('auth', `${this.label} rechazó la clave`)
     if (res.status === 429) throw new ProviderError('rate', `${this.label} está limitando las peticiones`)
+    if (res.status === 404) throw new ProviderError('model', `${this.label} no tiene el modelo ${this.model}`)
     if (!res.ok) throw new ProviderError('api', `${this.label} respondió ${res.status}`)
   }
 }
@@ -121,7 +123,9 @@ function toProviderError(error: unknown): ProviderError {
   return new ProviderError('api', 'Claude no pudo responder')
 }
 
-export const GROQ_DEFAULT_MODEL = 'llama-3.3-70b-versatile'
+// Modelo de producción de Groq disponible en el plan gratis (octubre 2026);
+// la lista cambia: https://console.groq.com/docs/models
+export const GROQ_DEFAULT_MODEL = 'openai/gpt-oss-120b'
 export const OLLAMA_DEFAULT_MODEL = 'llama3.2'
 
 /**
