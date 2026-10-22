@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { ApplicationModule } from './application/application.module'
+import { AssistantModule } from './assistant/assistant.module'
 import { AuthModule } from './auth/auth.module'
 import { CompanyModule } from './company/company.module'
 import { EvaluationModule } from './evaluation/evaluation.module'
@@ -7,6 +8,7 @@ import { HourLogModule } from './hour-log/hour-log.module'
 import { OfferModule } from './offer/offer.module'
 import { PlacementModule } from './placement/placement.module'
 import { PrismaModule } from './prisma/prisma.module'
+import { RecommendationModule } from './recommendation/recommendation.module'
 import { SyncModule } from './sync/sync.module'
 
 import { APP_INTERCEPTOR } from '@nestjs/core'
@@ -23,6 +25,8 @@ import { SanitizeResponseInterceptor } from './common/sanitize.interceptor'
     HourLogModule,
     EvaluationModule,
     SyncModule,
+    RecommendationModule,
+    AssistantModule,
   ],
   providers: [
     {

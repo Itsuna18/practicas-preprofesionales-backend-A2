@@ -26,77 +26,125 @@ export interface AccreditationResult {
   completionPercentage: number
 }
 
-// D-05: complejidad ciclomática 17, anidamiento de 6 niveles.
-// ESLint la marca con `complexity` (umbral 10). No refactorizar.
+interface AccreditationDecision {
+  level: AccreditationLevel
+  reasons: string[]
+}
+
+interface AccreditationRule {
+  description: string
+  condition: (input: AccreditationInput) => boolean
+  evaluate: (input: AccreditationInput) => AccreditationDecision
+}
+
+const ACCREDITATION_RULES: AccreditationRule[] = [
+  {
+    description: 'Práctica abandonada',
+    condition: (i) => i.placementStatus === 'ABANDONED',
+    evaluate: (i) => ({
+      level: 'NO_ACREDITADO',
+      reasons: [
+        'placement abandonado',
+        ...(i.pendingHours > 0 ? [`hay ${i.pendingHours} horas pendientes sin revisar`] : []),
+      ],
+    }),
+  },
+  {
+    description: 'Práctica suspendida',
+    condition: (i) => i.placementStatus === 'SUSPENDED',
+    evaluate: (i) => ({
+      level: 'NO_ACREDITADO',
+      reasons: [
+        'placement suspendido',
+        ...(i.hasAgreement ? ['convenio vigente pese a la suspensión'] : []),
+      ],
+    }),
+  },
+  {
+    description: 'Horas insuficientes',
+    condition: (i) => i.approvedHours < i.requiredHours,
+    evaluate: (i) => ({
+      level: 'PENDIENTE',
+      reasons: [
+        'horas insuficientes',
+        ...(i.pendingHours > 0 ? [`hay ${i.pendingHours} horas pendientes de aprobación`] : []),
+      ],
+    }),
+  },
+  {
+    description: 'Falta convenio',
+    condition: (i) => !i.hasAgreement,
+    evaluate: (i) => ({
+      level: 'NO_ACREDITADO',
+      reasons: [
+        'falta convenio',
+        ...(i.hasInsurance ? ['seguro vigente pese a la falta de convenio'] : []),
+      ],
+    }),
+  },
+  {
+    description: 'Falta seguro',
+    condition: (i) => !i.hasInsurance,
+    evaluate: (i) => ({
+      level: 'NO_ACREDITADO',
+      reasons: [
+        'falta seguro',
+        ...(i.pendingHours > 0 ? [`hay ${i.pendingHours} horas pendientes de aprobación`] : []),
+      ],
+    }),
+  },
+  {
+    description: 'Falta informe final',
+    condition: (i) => !i.hasFinalReport,
+    evaluate: () => ({
+      level: 'PENDIENTE',
+      reasons: ['falta informe final'],
+    }),
+  },
+  {
+    description: 'Falta evaluación del tutor',
+    condition: (i) => i.tutorEvaluationScore === null,
+    evaluate: () => ({
+      level: 'PENDIENTE',
+      reasons: ['falta evaluación del tutor'],
+    }),
+  },
+  {
+    description: 'Evaluación del tutor por debajo del mínimo',
+    condition: (i) => i.tutorEvaluationScore! < 3,
+    evaluate: (i) => ({
+      level: 'NO_ACREDITADO',
+      reasons: [
+        'evaluación del tutor por debajo del mínimo',
+        ...(i.hasFinalReport ? ['informe final entregado pese a evaluación baja'] : []),
+      ],
+    }),
+  },
+  {
+    description: 'Falta evaluación de la empresa o es baja',
+    condition: (i) => i.companyEvaluationScore === null || i.companyEvaluationScore < 3,
+    evaluate: () => ({
+      level: 'ACREDITADO_CON_OBSERVACIONES',
+      reasons: ['falta evaluación de la empresa o es baja'],
+    }),
+  },
+]
+
+const DEFAULT_ACCREDITED: AccreditationDecision = {
+  level: 'ACREDITADO',
+  reasons: [],
+}
+
 export function calculateAccreditationStatus(input: AccreditationInput): AccreditationResult {
-  const reasons: string[] = []
-  let level: AccreditationLevel = 'PENDIENTE'
   const percentage = Math.round((input.approvedHours / input.requiredHours) * 100)
+  const matchedRule = ACCREDITATION_RULES.find((rule) => rule.condition(input))
+  const decision = matchedRule ? matchedRule.evaluate(input) : DEFAULT_ACCREDITED
 
-  if (input.placementStatus === 'ABANDONED') {
-    level = 'NO_ACREDITADO'
-    reasons.push('placement abandonado')
-    if (input.pendingHours > 0) {
-      reasons.push(`hay ${input.pendingHours} horas pendientes sin revisar`)
-    }
-  } else {
-    if (input.placementStatus === 'SUSPENDED') {
-      level = 'NO_ACREDITADO'
-      reasons.push('placement suspendido')
-      if (input.hasAgreement) {
-        reasons.push('convenio vigente pese a la suspensión')
-      }
-    } else {
-      if (input.approvedHours >= input.requiredHours) {
-        if (input.hasAgreement) {
-          if (input.hasInsurance) {
-            if (input.hasFinalReport) {
-              if (input.tutorEvaluationScore !== null) {
-                if (input.tutorEvaluationScore >= 3) {
-                  if (input.companyEvaluationScore !== null && input.companyEvaluationScore >= 3) {
-                    level = 'ACREDITADO'
-                  } else {
-                    level = 'ACREDITADO_CON_OBSERVACIONES'
-                    reasons.push('falta evaluación de la empresa o es baja')
-                  }
-                } else {
-                  level = 'NO_ACREDITADO'
-                  reasons.push('evaluación del tutor por debajo del mínimo')
-                  if (input.hasFinalReport) {
-                    reasons.push('informe final entregado pese a evaluación baja')
-                  }
-                }
-              } else {
-                level = 'PENDIENTE'
-                reasons.push('falta evaluación del tutor')
-              }
-            } else {
-              level = 'PENDIENTE'
-              reasons.push('falta informe final')
-            }
-          } else {
-            level = 'NO_ACREDITADO'
-            reasons.push('falta seguro')
-            if (input.pendingHours > 0) {
-              reasons.push(`hay ${input.pendingHours} horas pendientes de aprobación`)
-            }
-          }
-        } else {
-          level = 'NO_ACREDITADO'
-          reasons.push('falta convenio')
-          if (input.hasInsurance) {
-            reasons.push('seguro vigente pese a la falta de convenio')
-          }
-        }
-      } else {
-        level = 'PENDIENTE'
-        reasons.push('horas insuficientes')
-        if (input.pendingHours > 0) {
-          reasons.push(`hay ${input.pendingHours} horas pendientes de aprobación`)
-        }
-      }
-    }
+  return {
+    placementId: input.placementId,
+    studentName: input.studentName,
+    level: decision.level,
+    reasons: decision.reasons,
+    completionPercentage: percentage,
   }
-
-  return { placementId: input.placementId, studentName: input.studentName, level, reasons, completionPercentage: percentage }
 }

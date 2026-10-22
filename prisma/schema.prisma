@@ -70,6 +70,11 @@ model User {
   role      Role     @default(STUDENT)
   createdAt DateTime @default(now())
 
+  // Perfil del estudiante para recomendar ofertas (extra: recomendador).
+  career            String?
+  interests         String[] @default([])
+  preferredModality String?
+
   company           Company?      @relation(fields: [companyId], references: [id])
   companyId         Int?
   applications      Application[]
