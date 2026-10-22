@@ -1,22 +1,18 @@
 import { HttpException, HttpStatus, ServiceUnavailableException } from '@nestjs/common'
-import Anthropic from '@anthropic-ai/sdk'
 import { Role } from '@prisma/client'
 import { plainToInstance } from 'class-transformer'
 import { validate } from 'class-validator'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { AssistantService, createAnthropicClient } from './assistant.service'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { AssistantService } from './assistant.service'
+import { type ChatProvider, ProviderError } from './chat-provider'
 import { ChatDto } from './dto/chat.dto'
 
 const context = { build: vi.fn() }
-const create = vi.fn()
-const client = { beta: { messages: { create } } } as unknown as Anthropic
+const complete = vi.fn()
+const provider: ChatProvider = { label: 'Groq', complete }
 
 const student = { sub: 7, role: Role.STUDENT }
 const ask = (content: string) => [{ role: 'user' as const, content }]
-
-function reply(text: string, stopReason = 'end_turn') {
-  return { stop_reason: stopReason, content: [{ type: 'thinking', thinking: '' }, { type: 'text', text }] }
-}
 
 describe('AssistantService', () => {
   let service: AssistantService
@@ -24,44 +20,35 @@ describe('AssistantService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     context.build.mockResolvedValue('Persona: Estudiante 0 · Rol: STUDENT')
-    service = new AssistantService(context as never, client)
+    complete.mockResolvedValue({ text: 'Te faltan 180 horas aprobadas.', refused: false })
+    service = new AssistantService(context as never, provider)
   })
 
-  afterEach(() => vi.unstubAllEnvs())
-
-  it('answers with the text blocks and sends the server-built context', async () => {
-    create.mockResolvedValue(reply('Te faltan 180 horas aprobadas.'))
-
+  it('answers with the provider reply and sends the server-built context', async () => {
     await expect(service.chat(student, ask('¿Cuántas horas me faltan?'))).resolves.toEqual({
       reply: 'Te faltan 180 horas aprobadas.',
     })
 
     expect(context.build).toHaveBeenCalledWith(student)
-    const params = create.mock.calls[0][0]
-    expect(params.model).toBe('claude-opus-5-5')
-    expect(params.fallbacks).toBe('default')
-    expect(params.betas).toEqual(['server-side-fallback-2026-07-01'])
-    expect(params.output_config).toEqual({ effort: 'low' })
-    expect(params.system[1].text).toBe('CONTEXTO\nPersona: Estudiante 0 · Rol: STUDENT')
-    expect(params.messages).toEqual([{ role: 'user', content: '¿Cuántas horas me faltan?' }])
+    const [system, messages] = complete.mock.calls[0]
+    expect(system[0]).toMatch(/asistente de la plataforma/)
+    expect(system[1]).toBe('CONTEXTO\nPersona: Estudiante 0 · Rol: STUDENT')
+    expect(messages).toEqual([{ role: 'user', content: '¿Cuántas horas me faltan?' }])
   })
 
-  it('uses the model from the environment when set', async () => {
-    vi.stubEnv('ANTHROPIC_MODEL', 'claude-sonnet-5-5')
-    create.mockResolvedValue(reply('ok'))
-    await service.chat(student, ask('hola'))
-    expect(create.mock.calls[0][0].model).toBe('claude-sonnet-5-5')
+  it('handles a refusal and an empty answer', async () => {
+    complete.mockResolvedValueOnce({ text: '', refused: true })
+    expect((await service.chat(student, ask('algo'))).reply).toMatch(/No puedo ayudarte con eso/)
+
+    complete.mockResolvedValueOnce({ text: '', refused: false })
+    expect((await service.chat(student, ask('algo'))).reply).toMatch(/reformular/)
   })
 
-  it('handles a refusal without showing an empty answer', async () => {
-    create.mockResolvedValue({ stop_reason: 'refusal', content: [] })
-    const result = await service.chat(student, ask('algo'))
-    expect(result.reply).toMatch(/No puedo ayudarte con eso/)
-  })
-
-  it('says it is not configured when the backend has no key', async () => {
+  it('says how to configure it for free when there is no provider', async () => {
     const unconfigured = new AssistantService(context as never, null)
-    await expect(unconfigured.chat(student, ask('hola'))).rejects.toThrow(ServiceUnavailableException)
+    const error = await unconfigured.chat(student, ask('hola')).catch((e: HttpException) => e)
+    expect(error).toBeInstanceOf(ServiceUnavailableException)
+    expect((error as HttpException).message).toMatch(/GROQ_API_KEY \(gratis en console\.groq\.com\)/)
   })
 
   it('requires the conversation to start and end with the person', async () => {
@@ -71,44 +58,36 @@ describe('AssistantService', () => {
         { role: 'assistant', content: 'hola' },
       ]),
     ).rejects.toThrow(/empezar y terminar/)
-    expect(create).not.toHaveBeenCalled()
+    expect(complete).not.toHaveBeenCalled()
   })
 
   it('limits each person to 20 messages every 10 minutes', async () => {
-    create.mockResolvedValue(reply('ok'))
     for (let i = 0; i < 20; i++) await service.chat(student, ask(`pregunta ${i}`))
 
     const error = await service.chat(student, ask('una más')).catch((e: HttpException) => e)
-    expect(error).toBeInstanceOf(HttpException)
     expect((error as HttpException).getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS)
 
     // Otra persona no comparte el cupo.
-    await expect(service.chat({ sub: 8, role: Role.TUTOR }, ask('hola'))).resolves.toEqual({ reply: 'ok' })
+    await expect(service.chat({ sub: 8, role: Role.TUTOR }, ask('hola'))).resolves.toBeDefined()
   })
 
-  it('translates SDK errors into clear HTTP errors', async () => {
-    create.mockRejectedValueOnce(new Anthropic.APIConnectionError({ message: 'down' }))
+  it.each([
+    ['auth', HttpStatus.SERVICE_UNAVAILABLE, /La clave de Groq no es válida/],
+    ['rate', HttpStatus.TOO_MANY_REQUESTS, /cupo gratuito/],
+    ['connection', HttpStatus.SERVICE_UNAVAILABLE, /No se pudo contactar a Groq/],
+    ['api', HttpStatus.BAD_GATEWAY, /error/],
+  ] as const)('translates a %s provider error into a clear HTTP error', async (kind, status, message) => {
+    complete.mockRejectedValueOnce(new ProviderError(kind, 'detalle'))
     const error = await service.chat(student, ask('hola')).catch((e: HttpException) => e)
-    expect((error as HttpException).getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE)
-
-    create.mockRejectedValueOnce(new Error('boom'))
-    const other = await service.chat(student, ask('hola')).catch((e: HttpException) => e)
-    expect((other as HttpException).getStatus()).toBe(HttpStatus.BAD_GATEWAY)
-  })
-})
-
-describe('createAnthropicClient', () => {
-  afterEach(() => vi.unstubAllEnvs())
-
-  it('returns null without credentials', () => {
-    vi.stubEnv('ANTHROPIC_API_KEY', '')
-    vi.stubEnv('ANTHROPIC_AUTH_TOKEN', '')
-    expect(createAnthropicClient()).toBeNull()
+    expect((error as HttpException).getStatus()).toBe(status)
+    expect((error as HttpException).message).toMatch(message)
   })
 
-  it('creates the client when there is a key', () => {
-    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-prueba')
-    expect(createAnthropicClient()).toBeInstanceOf(Anthropic)
+  it('does not leak unexpected errors', async () => {
+    complete.mockRejectedValueOnce(new Error('boom interno'))
+    const error = await service.chat(student, ask('hola')).catch((e: HttpException) => e)
+    expect((error as HttpException).getStatus()).toBe(HttpStatus.BAD_GATEWAY)
+    expect((error as HttpException).message).not.toMatch(/boom/)
   })
 })
 

@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common'
 import { AssistantContextService } from './assistant-context.service'
 import { AssistantController } from './assistant.controller'
-import { ANTHROPIC_CLIENT, AssistantService, createAnthropicClient } from './assistant.service'
+import { CHAT_PROVIDER, AssistantService } from './assistant.service'
+import { createChatProvider } from './chat-provider'
 
 @Module({
   controllers: [AssistantController],
   providers: [
     AssistantService,
     AssistantContextService,
-    { provide: ANTHROPIC_CLIENT, useFactory: createAnthropicClient },
+    { provide: CHAT_PROVIDER, useFactory: () => createChatProvider() },
   ],
 })
 export class AssistantModule {}
