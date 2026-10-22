@@ -41,7 +41,7 @@ describe('scoreOffer', () => {
   it('ignores accents and case when matching', () => {
     const profile: StudentProfile = { career: 'Ciencia de Datos', interests: [], preferredModality: null }
     const result = scoreOffer(profile, offer({ title: 'PRACTICANTE DE ANÁLISIS', description: 'Reportes', companySector: 'Salud' }))!
-    expect(result.reasons[0]).toBe('Afín a Ciencia de Datos: analisis, reportes')
+    expect(result.reasons[0]).toBe('Afín a Ciencia de Datos: análisis, reportes')
   })
 
   it('matches whole words only', () => {
