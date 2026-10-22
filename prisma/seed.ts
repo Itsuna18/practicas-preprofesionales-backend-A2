@@ -151,6 +151,26 @@ async function main() {
     await prisma.hourLog.createMany({ data: rows })
   }
 
+  // Ofertas del próximo periodo, sin postulaciones: con cupos libres para que
+  // el recomendador y las postulaciones se puedan demostrar.
+  for (const [index, company] of companies.entries()) {
+    const kind = OFFER_KINDS[index % OFFER_KINDS.length]
+    await prisma.offer.create({
+      data: {
+        companyId: company.id,
+        title: `Practicante ${kind.role} (próximo periodo) — ${company.name}`,
+        description: `${kind.description} Prácticas preprofesionales de 240 horas.`,
+        modality: MODALITIES[index % MODALITIES.length],
+        seats: 2 + nextInt(3),
+        requiredHours: 240,
+        periodStart: new Date('2026-11-02'),
+        periodEnd: new Date('2027-03-31'),
+        status: OfferStatus.PUBLISHED,
+        publishedAt: new Date('2026-10-01'),
+      },
+    })
+  }
+
   console.log(`seed listo — coordinador: ${coordinator.email} / yura1234`)
 }
 
