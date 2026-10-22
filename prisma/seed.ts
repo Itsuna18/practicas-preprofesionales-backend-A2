@@ -16,6 +16,21 @@ const OFFERS_PER_COMPANY = 3
 const PLACEMENTS = 200
 const HOURLOGS_PER_PLACEMENT = 20
 
+// Ofertas y perfiles variados para que el recomendador tenga con qué trabajar.
+const OFFER_KINDS = [
+  { role: 'Backend', description: 'Desarrollo de APIs y servicios backend con bases de datos relacionales.' },
+  { role: 'QA', description: 'Pruebas de software, automatización y control de calidad de procesos.' },
+  { role: 'Datos', description: 'Análisis de datos, reportes e inteligencia de negocio para la gestión.' },
+]
+const MODALITIES = ['PRESENCIAL', 'HIBRIDA', 'REMOTA']
+const STUDENT_PROFILES = [
+  { career: 'Ingeniería de Software', interests: ['backend', 'pruebas'] },
+  { career: 'Ciencia de Datos', interests: ['datos'] },
+  { career: 'Ingeniería Industrial', interests: ['calidad', 'manufactura'] },
+  { career: 'Agronomía', interests: ['agro', 'datos'] },
+  { career: 'Enfermería', interests: ['salud'] },
+]
+
 async function main() {
   // Limpiar base de datos para que el seed sea idempotente
   await prisma.hourLog.deleteMany()
@@ -69,9 +84,9 @@ async function main() {
       offers.push(await prisma.offer.create({
         data: {
           companyId: company.id,
-          title: `Practicante ${['Backend', 'QA', 'Datos'][j]} — ${company.name}`,
-          description: 'Prácticas preprofesionales de 240 horas en modalidad presencial.',
-          modality: j % 2 === 0 ? 'PRESENCIAL' : 'HIBRIDA',
+          title: `Practicante ${OFFER_KINDS[j].role} — ${company.name}`,
+          description: `${OFFER_KINDS[j].description} Prácticas preprofesionales de 240 horas.`,
+          modality: MODALITIES[(j + offers.length) % MODALITIES.length],
           seats: 2 + nextInt(4),
           requiredHours: 240,
           periodStart: new Date('2026-03-01'),
@@ -85,7 +100,14 @@ async function main() {
 
   for (let i = 0; i < PLACEMENTS; i++) {
     const student = await prisma.user.create({
-      data: { email: `estudiante${i}@miyura.com`, password, fullName: `Estudiante ${i}`, role: Role.STUDENT },
+      data: {
+        email: `estudiante${i}@miyura.com`,
+        password,
+        fullName: `Estudiante ${i}`,
+        role: Role.STUDENT,
+        ...STUDENT_PROFILES[i % STUDENT_PROFILES.length],
+        preferredModality: MODALITIES[i % MODALITIES.length],
+      },
     })
     const offer = offers[i % offers.length]
     const application = await prisma.application.create({
@@ -127,6 +149,26 @@ async function main() {
       })
     }
     await prisma.hourLog.createMany({ data: rows })
+  }
+
+  // Ofertas del próximo periodo, sin postulaciones: con cupos libres para que
+  // el recomendador y las postulaciones se puedan demostrar.
+  for (const [index, company] of companies.entries()) {
+    const kind = OFFER_KINDS[index % OFFER_KINDS.length]
+    await prisma.offer.create({
+      data: {
+        companyId: company.id,
+        title: `Practicante ${kind.role} (próximo periodo) — ${company.name}`,
+        description: `${kind.description} Prácticas preprofesionales de 240 horas.`,
+        modality: MODALITIES[index % MODALITIES.length],
+        seats: 2 + nextInt(3),
+        requiredHours: 240,
+        periodStart: new Date('2026-11-02'),
+        periodEnd: new Date('2027-03-31'),
+        status: OfferStatus.PUBLISHED,
+        publishedAt: new Date('2026-10-01'),
+      },
+    })
   }
 
   console.log(`seed listo — coordinador: ${coordinator.email} / yura1234`)

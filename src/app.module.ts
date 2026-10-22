@@ -7,6 +7,7 @@ import { HourLogModule } from './hour-log/hour-log.module'
 import { OfferModule } from './offer/offer.module'
 import { PlacementModule } from './placement/placement.module'
 import { PrismaModule } from './prisma/prisma.module'
+import { RecommendationModule } from './recommendation/recommendation.module'
 import { SyncModule } from './sync/sync.module'
 
 import { APP_INTERCEPTOR } from '@nestjs/core'
@@ -23,6 +24,7 @@ import { SanitizeResponseInterceptor } from './common/sanitize.interceptor'
     HourLogModule,
     EvaluationModule,
     SyncModule,
+    RecommendationModule,
   ],
   providers: [
     {

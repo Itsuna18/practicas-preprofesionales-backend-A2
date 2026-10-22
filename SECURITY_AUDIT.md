@@ -31,6 +31,9 @@ comprueba que el recurso le pertenece a quien llama.
 | PATCH | /offers/:id/close | COMPANY, COORDINATOR | **No** |
 | GET | /sync/pull | cualquier rol autenticado | Sí, acotado por userId |
 | POST | /sync/push | cualquier rol autenticado | Sí, acotado por userId |
+| GET | /profile | STUDENT | Sí, implícito por token |
+| PATCH | /profile | STUDENT | Sí, implícito por token |
+| GET | /recommendations/offers | STUDENT | Sí, implícito por token; solo ofertas publicadas |
 
 Frontend: no tiene autorización propia, confía en el backend. No se audita aparte.
 
